@@ -1,0 +1,183 @@
+
+<!DOCTYPE html> 
+
+<head>
+  <meta charset="UTF-8" />
+  <!--
+    Viewport meta:
+    Tells mobile browsers to use the device width, so the page scales correctly.
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexStop: Bus Tracking</title>
+
+  <!-- Leaflet map stylesheet-->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Web font：Inter -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+
+  <!--
+    Tailwind via CDN:
+    Load Tailwind so we can style with utility classes directly in the HTML.
+  -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Custom Tailwind config (external) -->
+  <script src="tailwind.config.js"></script>
+
+  <!-- Custom styles (external) -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<!--
+  body uses Tailwind utilities for font, background and text color.
+-->
+<body class="font-sans bg-canvas text-ink antialiased">
+
+  <!--
+    .app / Root container:
+    flex places sidebar + map side by side; h-screen = full viewport height.
+  -->
+  <div class="app relative flex h-screen overflow-hidden">
+
+    <!-- ====================================================================
+         SIDEBAR
+         Desktop: fixed 380px panel. Mobile: slide-in drawer.
+         ==================================================================== -->
+    <aside id="sidebar"
+      class="sidebar absolute lg:static z-[1000] flex h-full w-full sm:w-[380px] lg:w-[380px] shrink-0 flex-col
+             bg-white shadow-soft -translate-x-full lg:translate-x-0
+             transition-transform duration-300 ease-out">
+
+      <!-- Sidebar header: logo + search -->
+      <div class="px-5 pt-5">
+        <div class="mb-4 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <!-- Logo tile -->
+            <div class="flex h-9 w-9 items-center justify-center rounded-[10px] bg-navy text-white">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/><circle cx="7" cy="17" r="1"/><circle cx="17" cy="17" r="1"/></svg>
+            </div>
+            <span class="text-xl font-bold text-navy">Bus<span class="text-brand-red">Track</span></span>
+          </div>
+          <!-- Close button for mobile drawer -->
+          <button id="closeSb" aria-label="Close"
+            class="flex items-center justify-center rounded-lg p-2 text-muted hover:bg-canvas">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!--
+          Search box:
+        -->
+        <div class="mb-3.5 flex items-center gap-2 rounded-[10px] border-[1.5px] border-line bg-canvas px-3.5 py-2.5
+                    transition focus-within:border-brand-blue focus-within:ring-2 focus-within:ring-brand-blue/20">
+          <svg class="shrink-0 text-muted" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="sbSearch" type="text" oninput="onSearch(this.value)"
+            placeholder="Search by stop number or name…"
+            class="flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted" />
+        </div>
+      </div>
+
+      <!--
+        Tab bar:
+        Four tabs (Nearby / Stops / Routes / Favorites). data-tab tells JS which view.
+      -->
+      <div class="flex border-b-[1.5px] border-line px-5">
+        <button class="tab-btn group flex flex-1 flex-col items-center gap-1 border-b-2 border-navy py-2.5 text-[11px] font-medium text-navy" data-tab="nearby">
+          <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          Nearby
+        </button>
+        <button class="tab-btn flex flex-1 flex-col items-center gap-1 border-b-2 border-transparent py-2.5 text-[11px] font-medium text-muted" data-tab="stops">
+          <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><circle cx="7" cy="17" r="1"/><circle cx="17" cy="17" r="1"/></svg>
+          Stops
+        </button>
+        <button class="tab-btn flex flex-1 flex-col items-center gap-1 border-b-2 border-transparent py-2.5 text-[11px] font-medium text-muted" data-tab="routes">
+          <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17h2a2 2 0 0 0 0-4H5l-2-6h14l1 3"/><path d="M14 17h6"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="17.5" cy="17" r="1.5"/></svg>
+          Routes
+        </button>
+        <button class="tab-btn flex flex-1 flex-col items-center gap-1 border-b-2 border-transparent py-2.5 text-[11px] font-medium text-muted" data-tab="favorites">
+          <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Saved
+        </button>
+      </div>
+
+      <!--
+        Sidebar body:
+        Content is injected by JS render(); this is data-driven rendering.
+      -->
+      <div id="sbBody" class="scroll-thin flex-1 overflow-y-auto px-5 py-4"></div>
+    </aside>
+
+    <!-- Dark overlay (Only Mobile)-->
+    <div id="overlay" class="absolute inset-0 z-[900] hidden bg-black/30"></div>
+
+    <!-- ====================================================================
+         MAP AREA
+         ==================================================================== -->
+    <div class="relative flex-1">
+
+      <!-- Floating top bar (mobile + tablet)
+           Hidden on desktop; appears below 1024px. A floating white pill:
+           hamburger (left) + search (center) + magnifier (right). -->
+      <div class="absolute inset-x-0 top-0 z-[400] p-3 lg:hidden">
+        <div class="flex items-center gap-2 rounded-full bg-white px-2.5 py-2 shadow-[0_4px_18px_rgba(26,35,64,.16)]">
+          <!-- Hamburger: opens the sidebar drawer -->
+          <button id="openSb" aria-label="Menu" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink hover:bg-canvas">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+          </button>
+          <!-- Center search input (synced with sidebar) -->
+          <input id="topSearch" type="text" oninput="onSearch(this.value)" placeholder="Search by stop number"
+            class="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted" />
+          <!-- Magnifier on the right -->
+          <span class="flex h-8 w-8 shrink-0 items-center justify-center text-muted">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </span>
+        </div>
+      </div>
+
+      <!-- Leaflet renders the map into this div -->
+      <div id="map" class="h-full w-full"></div>
+
+      <!-- Map controls: locate, zoom in/out -->
+      <div class="absolute right-4 top-4 z-[400] flex flex-col gap-2 lg:top-4 max-lg:top-[64px]">
+        <button id="locBtn" title="My location" class="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-ink shadow-soft hover:bg-canvas">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+        </button>
+        <button id="zinBtn" title="Zoom in" class="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-ink shadow-soft hover:bg-canvas">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button id="zoutBtn" title="Zoom out" class="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-ink shadow-soft hover:bg-canvas">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+
+      <!-- Live badge -->
+     <div class="absolute right-4 top-4 z-[400] flex flex-col gap-2"> 
+        <button id="locBtn"></button>
+        <button id="zinBtn"></button>
+        <button id="zoutBtn"></button>
+    </div>
+
+      <!-- ==================================================================
+           BOTTOM SHEET（mobile only）
+           On phones the sidebar content lives in a pull-up sheet instead.
+           ================================================================== -->
+      <div id="bsheet" class="bsheet absolute inset-x-0 bottom-0 z-[400] hidden max-h-[66vh] overflow-y-auto rounded-t-[20px] bg-white shadow-[0_-4px_24px_rgba(0,0,0,.12)] max-sm:block">
+        <div id="bsHandle" class="mx-auto mt-2.5 h-1 w-9 cursor-pointer rounded-full bg-line"></div>
+        <!-- Sheet tab bar -->
+        <div class="flex justify-around border-b border-line py-2.5">
+          <button class="bn-btn flex flex-col items-center gap-1 px-3 text-[10px] font-medium text-navy" data-tab="nearby"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Nearby</button>
+          <button class="bn-btn flex flex-col items-center gap-1 px-3 text-[10px] font-medium text-muted" data-tab="stops"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><circle cx="7" cy="17" r="1"/><circle cx="17" cy="17" r="1"/></svg>Stops</button>
+          <button class="bn-btn flex flex-col items-center gap-1 px-3 text-[10px] font-medium text-muted" data-tab="routes"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17h2a2 2 0 0 0 0-4H5l-2-6h14l1 3"/><path d="M14 17h6"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="17.5" cy="17" r="1.5"/></svg>Routes</button>
+          <button class="bn-btn flex flex-col items-center gap-1 px-3 text-[10px] font-medium text-muted" data-tab="favorites"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Saved</button>
+        </div>
+        <!-- Sheet body (shares the same HTML as sidebar) -->
+        <div id="bsBody" class="px-4 pb-6 pt-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load Leaflet first, then our app -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script> /* from internet */
+  <script src="app 1.js"></script>
+</body>
+</html>

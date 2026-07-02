@@ -1,0 +1,100 @@
+/* ============================================================================
+   BusRoute — style.css（自訂樣式 / custom styles）
+   ----------------------------------------------------------------------------
+   這裡只放「Tailwind class 不好直接表達」的東西：
+     1) #map 的堆疊層級修正（關鍵！）
+     2) Leaflet 地圖內部元素外觀（popup、marker）
+     3) 自訂動畫（脈動光點、公車方向箭頭）
+     4) 卷軸、底部抽屜動畫
+   These are things hard to express with Tailwind utility classes.
+   ============================================================================ */
+
+/* ── 關鍵修正 / The key fix ──────────────────────────────────────────────────
+   問題：Leaflet 會在地圖內建立很多圖層(pane)，z-index 最高到約 700，
+        導致漢堡選單、搜尋列(z-400)被地圖蓋住、點不到。
+   解法：給 #map 一個 z-index:0，讓它成為「獨立堆疊層」，
+        地圖內部所有東西都被關在這個 0 的層裡，外面任何元素都會浮在上面。
+   Problem: Leaflet's internal panes go up to z-index ~700 and cover our UI.
+   Fix: make #map its own stacking context (z-index:0) so its panes stay inside
+        it; any sibling with z-index >= 1 then sits on top. */
+#map { position: relative; z-index: 0; }
+
+/* Make Leaflet use the same font */
+.leaflet-container { font-family: 'Inter', sans-serif; }
+
+/* Leaflet Popup look */
+.leaflet-popup-content-wrapper { border-radius: 14px; box-shadow: 0 2px 16px rgba(26,35,64,.18); }
+.leaflet-popup-content { margin: 12px 14px; min-width: 180px; }
+
+/* User location: pulsing rings */
+.upulse-ring { width:74px; height:74px; border-radius:50%;
+  background:rgba(77,171,247,.16); border:2px solid rgba(77,171,247,.35);
+  display:flex; align-items:center; justify-content:center; }
+.upulse-dot { width:14px; height:14px; background:#4dabf7; border-radius:50%;
+  border:3px solid #fff; box-shadow:0 0 0 0 rgba(77,171,247,.6); animation:upl 2s infinite; }
+@keyframes upl { 0%{box-shadow:0 0 0 0 rgba(77,171,247,.6)}
+  70%{box-shadow:0 0 0 12px rgba(77,171,247,0)} 100%{box-shadow:0 0 0 0 rgba(77,171,247,0)} }
+
+/* 「Live] Breathing live dot */
+.live-dot { animation: pgr 1.5s infinite; }
+@keyframes pgr { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.55;transform:scale(1.35)} }
+
+/* ── Bus marker ───────────────────────────────────────────────────
+   A teardrop badge with a white bus glyph, a rotating direction arrow,
+   and a pulsing ring. */
+.bus-pin { position: relative; width: 38px; height: 38px; }
+.bus-pin .badge {
+  position:absolute; inset:0; border-radius:50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 4px 10px rgba(0,0,0,.30); border:2.5px solid #fff;
+  display:flex; align-items:center; justify-content:center;
+}
+.bus-pin .badge svg { transform: rotate(45deg); }   /* un-rotate the glyph */
+.bus-pin .arrow {
+  position:absolute; left:50%; top:50%; width:0; height:0;
+  border-left:5px solid transparent; border-right:5px solid transparent;
+  border-bottom:8px solid #1a2340;
+  transform-origin: center -14px;   /* rotate around pin center */
+  margin-left:-5px; margin-top:-2px;
+}
+.bus-pin .ring {
+  position:absolute; inset:-6px; border-radius:50%;
+  border:2px solid rgba(255,255,255,.0); animation: busring 2.2s infinite;
+}
+@keyframes busring { 0%{box-shadow:0 0 0 0 rgba(0,0,0,.12)} 70%{box-shadow:0 0 0 8px rgba(0,0,0,0)} 100%{box-shadow:0 0 0 0 rgba(0,0,0,0)} }
+
+/* Bus-stop marker（小圓點） */
+.stop-pin { width:26px; height:26px; border-radius:50%; border:2.5px solid #fff;
+  display:flex; align-items:center; justify-content:center; color:#fff;
+  box-shadow:0 2px 6px rgba(0,0,0,.22); }
+
+/* Thin scrollbar */
+.scroll-thin::-webkit-scrollbar { width:5px; }
+.scroll-thin::-webkit-scrollbar-thumb { background:#e5e7eb; border-radius:4px; }
+
+/* Bottom-sheet slide transition（mobile） */
+.bsheet { transform: translateY(calc(100% - 84px)); transition: transform .32s cubic-bezier(.16,1,.3,1); }
+.bsheet.exp { transform: translateY(0); }
+
+.route-label {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a2340;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.stop-label {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #1a2340;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  white-space: nowrap;
+}
